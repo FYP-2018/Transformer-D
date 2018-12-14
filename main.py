@@ -20,11 +20,9 @@ from rouge_tensor import rouge_l_sentence_level
 def train():
     try:
         if not os.path.exists(hp.logdir):
-            tf.logging.info('making logdir')
             os.mkdir(hp.logdir)
     except:
         tf.logging.info('making logdir failed')
-        pass
 
     # Load vocabulary
     de2idx, idx2de = load_doc_vocab()
@@ -48,10 +46,10 @@ def train():
             for epoch in range(1, hp.num_epochs+1):
                 print("Starting {}-th epoch".format(epoch))
 
-                if epoch == 1:
-                    sess.run(train_g.eta.initializer) # explicitly init eta
-                    train_g.subset_saver.restore(sess, tf.train.latest_checkpoint(hp.pretrain_logdir))
-                    print("Restored previous training model!")
+                # if epoch == 1:
+                #     sess.run(train_g.eta.initializer) # explicitly init eta
+                #     train_g.subset_saver.restore(sess, tf.train.latest_checkpoint(hp.pretrain_logdir))
+                #     print("Restored previous training model!")
 
                 if sv.should_stop():
                     break
@@ -60,12 +58,12 @@ def train():
                     true_step = step + (epoch - 1) * train_g.num_batch
 
                     if true_step % hp.train_record_steps == 0:
-                        # outp = [train_g.loss, train_g.acc, train_g.rouge, train_g.globle_norm_ml, train_g.merged, train_op,]
+                        # outp = [train_g.loss, train_g.acc, train_g.rouge, train_g.globle_norm_ml, train_g.merged, train_g.train_op_ml,]
                         # loss, acc, rouge, norm_ml, summary, _ = sess.run(outp)
-                        summary, _ = sess.run(outp)
+                        summary, _ = sess.run([train_g.merged, train_g.train_op_ml])
                         train_g.filewriter.add_summary(summary, true_step)
                     else:
-                        sess.run(train_op)
+                        sess.run(train_g.train_op_ml)
 
                     if true_step % hp.checkpoint_steps == 0:
                         sv.saver.save(sess, hp.logdir + '/model_epoch_%02d_step_%d' % (epoch, true_step))
@@ -210,6 +208,7 @@ def eval(type='eval', cur_step=0, write_file=True):
             rouge = np.mean(rouge)
 
     return None
+
 
 if __name__ == '__main__':
     logging.info("START")

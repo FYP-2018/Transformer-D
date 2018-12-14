@@ -10,6 +10,7 @@ https://www.github.com/kyubyong/transformer
 import os
 
 DATASET_PATH = '/floyd/input'  # & mount dataset into 'train' folder
+# DATASET_PATH = 'D:/Crystina Desktop/HKUST/YR 3 SUMMER/FYP/dataset/CNNDM/processed'
 
 class Hyperparams: # for CNNDM data
     logdir = 'logdir' # log directory
@@ -20,7 +21,7 @@ class Hyperparams: # for CNNDM data
     train_record_steps = 50
     num_epochs = 60
 
-    batch_size = 50  # orig：32
+    batch_size = 1  # orig：32
 
     ## data source
     source_train = os.path.join(DATASET_PATH, 'train', 'sampled_content.txt')

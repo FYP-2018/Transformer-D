@@ -11,9 +11,7 @@ io_pairs = namedtuple(typename='io_pairs', field_names='input output')
 class Graph():
     def __init__(self, is_training=True):
         self.graph = tf.Graph()
-        # de2idx, idx2de = load_doc_vocab()
-        # self.vocab_size = len(de2idx)
-        self.vocab_size = len(load_doc_vocab()[0])
+        self.vocab_size = len(load_doc_vocab()[0])  # load_doc_vocab returns: de2idx, idx2de
 
         with self.graph.as_default():
             if is_training:
@@ -26,9 +24,9 @@ class Graph():
 
             self._add_encoder(is_training=is_training)
             self.ml_loss = self._add_ml_loss(is_training=is_training)
+            self.loss = self.ml_loss
 
             if is_training:
-                # Training Scheme
                 self.global_step = tf.Variable(0, name='global_step', trainable=False)
                 self.optimizer = tf.train.AdamOptimizer(learning_rate=hp.lr, beta1=0.9, beta2=0.98, epsilon=1e-8)
 
@@ -39,7 +37,7 @@ class Graph():
                 clipped_grad_ml, globle_norm_ml = tf.clip_by_global_norm(grad_ml, hp.maxgradient)
                 self.globle_norm_ml = globle_norm_ml
                 self.train_op_ml  = self.optimizer.apply_gradients(grads_and_vars=zip(clipped_grad_ml, vars_ml),
-                                                                  global_step=self.global_step)
+                                                                   global_step=self.global_step)
                 '''
                 # training wihtout gradient clipping
                 self.train_op_ml  = self.optimizer.apply_gradients(grads_and_vars=grads_and_vars_ml,
@@ -51,11 +49,6 @@ class Graph():
                 tf.summary.scalar('loss', self.loss)
 
                 self.merged = tf.summary.merge_all()
-
-                # prepare the Saver that restore all variables other than eta
-                all_var = tf.get_collection(key=tf.GraphKeys.GLOBAL_VARIABLES)
-                all_var.remove(self.eta)
-                self.subset_saver = tf.train.Saver(var_list=all_var)
 
         self.filewriter = tf.summary.FileWriter(hp.tb_dir + '/train', self.graph)
 
@@ -91,7 +84,7 @@ class Graph():
                 self.enc = tf.layers.dropout(self.enc,
                                              rate=hp.dropout_rate,
                                              training=tf.convert_to_tensor(is_training))
-
+                                             
                 ## Blocks
                 for i in range(hp.num_blocks):
                     with tf.variable_scope("num_blocks_{}".format(i)):
@@ -187,7 +180,7 @@ class Graph():
         with self.graph.as_default():
             self.preds = tf.to_int32(tf.argmax(logits, axis=-1)) # shape: (batch_size, max_timestep)
             self.istarget = tf.to_float(tf.not_equal(self.y, 0)) # shape: (batch_size, max_timestep)
-            self. = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.y)) * self.istarget) / (
+            self.acc = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.y)) * self.istarget) / (
                 tf.reduce_sum(self.istarget))
 
             self.rouge = tf.reduce_sum(rouge_l_fscore(self.preds, self.y)) / float(hp.batch_size)
