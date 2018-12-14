@@ -221,7 +221,7 @@ def multihead_attention(queries,
         if num_units is None:
             num_units = queries.get_shape().as_list[-1]
 
-        # transform into new dimenion, no activation required 
+        # transform into new dimenion, no activation required
         Q = tf.layers.dense(queries, num_units, use_bias=False, activation=None) # (N, T_q, C)
         K = tf.layers.dense(keys, num_units, use_bias=False, activation=None) # (N, T_k, C)
         V = tf.layers.dense(keys, num_units, use_bias=False, activation=None) # (N, T_k, C)
