@@ -49,6 +49,7 @@ class Graph():
                 # Summary
                 tf.summary.scalar('globle_norm_ml', globle_norm_ml)
                 tf.summary.scalar('loss', self.loss)
+
                 self.merged = tf.summary.merge_all()
 
                 # prepare the Saver that restore all variables other than eta
@@ -192,6 +193,7 @@ class Graph():
             self.rouge = tf.reduce_sum(rouge_l_fscore(self.preds, self.y)) / float(hp.batch_size)
 
             tf.summary.scalar('acc', self.acc)
+            tf.summary.scalar('rouge', self.rouge)
 
             ml_loss = -100
             if is_training:

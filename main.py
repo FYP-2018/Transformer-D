@@ -60,12 +60,10 @@ def train():
                     true_step = step + (epoch - 1) * train_g.num_batch
 
                     if true_step % hp.train_record_steps == 0:
-                        outp = [train_g.loss, train_g.acc, train_g.rouge, train_g.reward_diff, train_g.clipped_reward_diff, train_g.globle_norm_ml, train_op, train_g.merged]
-                        loss, acc, rouge, reward_diff, clipped_reward_diff, norm_ml, _, summary = sess.run(outp)
-
-                        # visualize
+                        # outp = [train_g.loss, train_g.acc, train_g.rouge, train_g.globle_norm_ml, train_g.merged, train_op,]
+                        # loss, acc, rouge, norm_ml, summary, _ = sess.run(outp)
+                        summary, _ = sess.run(outp)
                         train_g.filewriter.add_summary(summary, true_step)
-
                     else:
                         sess.run(train_op)
 
@@ -73,11 +71,12 @@ def train():
                         sv.saver.save(sess, hp.logdir + '/model_epoch_%02d_step_%d' % (epoch, true_step))
 
                     if true_step > 0 and true_step % hp.eval_record_steps == 0:
+                        pass
                         eval(cur_step=true_step, write_file=False)
 
                     # iteration indent
                 # epoch indent
-                eval(cur_step=true_step, write_file=True)
+                # eval(cur_step=true_step, write_file=True)
     print("Done")
 
 

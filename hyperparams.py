@@ -11,21 +11,20 @@ import os
 
 DATASET_PATH = '/floyd/input'  # & mount dataset into 'train' folder
 
-class CNNDM_Hyperparams: # for CNNDM data
+class Hyperparams: # for CNNDM data
     logdir = 'logdir' # log directory
     tb_dir = 'tbdir'
     checkpoint_steps = 1000
     eval_record_threshold = 1000
     eval_record_steps = 200  # should be larger than checkpoint_steps? otherwise would duplicate
     train_record_steps = 50
-    # num_ml_epoch = 60
     num_epochs = 60
 
     batch_size = 50  # orig：32
 
     ## data source
-    source_train = os.path.join(DATASET_PATH, 'train', 'train_content.txt')
-    target_train = os.path.join(DATASET_PATH, 'train', 'train_summary.txt')
+    source_train = os.path.join(DATASET_PATH, 'train', 'sampled_content.txt')
+    target_train = os.path.join(DATASET_PATH, 'train', 'sampled_summary.txt')
     source_valid = os.path.join(DATASET_PATH, 'train', 'val_content.txt') # change
     target_valid = os.path.join(DATASET_PATH, 'train', 'val_summary.txt') # change
     source_test = os.path.join(DATASET_PATH, 'train', 'test_content.txt')
@@ -100,7 +99,7 @@ class giga_Hyperparams: # giga
     maxgradient = 1000
 
 
-class Hyperparams: # for LCSTS char data
+class LCSTS_Hyperparams: # for LCSTS char data
     ## log path; frequency
     pretrain_logdir = './' # log directory
     logdir = 'logdir'
@@ -155,6 +154,7 @@ class Hyperparams: # for LCSTS char data
     dropout_rate = 0.1
     # eta_init = 0.95
     maxgradient = 1000
+
 
 class hknews_Hyperparams: # for hknews char data
     ## log path; frequency
