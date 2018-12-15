@@ -9,8 +9,8 @@ https://www.github.com/kyubyong/transformer
 # from nsml import DATASET_PATH
 import os
 
-DATASET_PATH = '/floyd/input'  # & mount dataset into 'train' folder
-# DATASET_PATH = 'D:/Crystina Desktop/HKUST/YR 3 SUMMER/FYP/dataset/CNNDM/processed'
+# DATASET_PATH = '/floyd/input'  # & mount dataset into 'train' folder
+DATASET_PATH = 'D:/Crystina Desktop/HKUST/YR 3 SUMMER/FYP/dataset/CNNDM/processed'
 
 class Hyperparams: # for CNNDM data
     logdir = 'logdir' # log directory

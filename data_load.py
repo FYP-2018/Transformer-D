@@ -18,7 +18,7 @@ def load_doc_vocab():
         idx, word = line.split()
         word2idx[word] = int(idx)
         idx2word[int(idx)] = word
-    
+
     logging.info("Size of doc dict: {}".format(len(word2idx)))
     return word2idx, idx2word
 
@@ -31,23 +31,38 @@ def load_sum_vocab():
         idx, word = line.split()
         word2idx[word] = int(idx)
         idx2word[int(idx)] = word
-          
+
     logging.info("Size of doc dict: {}".format(len(word2idx)))
     return word2idx, idx2word
 
 
-def create_data(source_path, target_path):
+def create_data(source_path, target_path, T_Decoder=False):
+    """
+    Args:
+        source_path (str):  path to source article file
+        target_path (str):  path to target summary file
+        T_Decoder (bool):   whether to create data for Encoder-Decoder
+            transformer or Decoder-only transformer
+    Returns:
+        (X, Y, Sources, Targets) or (XY, Sources, Targets) depends on the
+        value of T_Decoder;
+        where each entry in XY is the concatenation of each entry in X and Y
+        i.e. xy = (x, special_symbol, y)
+    """
     logging.info("Creating data...")
-    
+
     article2idx, idx2article = load_doc_vocab()
     sum2idx, idx2sum = load_sum_vocab()
-    
+
     source_file = open(source_path, 'r', encoding='utf-8')
     target_file = open(target_path, 'r', encoding='utf-8')
 
-    X, Y, Sources, Targets = [], [], [], []
+    if not T_Decoder:
+        X, Y, Sources, Targets = [], [], [], []
+    else:
+        XY, Sources, Targets = [], [], []
     cur_ariticle_idx = 0
-    
+
     while True:
         source_sent = source_file.readline()
         target_sent = target_file.readline()
@@ -59,10 +74,10 @@ def create_data(source_path, target_path):
 
         if cur_ariticle_idx % 1000000 == 0:
             print("\tPreparing {}-th article matrix".format(cur_ariticle_idx))
-        
+
         # if cur_ariticle_idx == 400:
         #     break  # TEMP
-        
+
         source_sent = source_sent.split()
         target_sent = target_sent.split()
 
@@ -78,10 +93,10 @@ def create_data(source_path, target_path):
 
         x = [article2idx.get(word, 1) for word in (source_sent + [u"</S>"])]
         y = [sum2idx.get(word, 1) for word in (target_sent + [u"</S>"]) ]
-        
-        if len(x) < hp.article_maxlen:
+
+        if len(x) <= hp.article_maxlen:
             x = np.lib.pad(x, [0, hp.article_maxlen - len(x)], 'constant', constant_values=(0, 0))
-        if len(y) < hp.summary_maxlen:
+        if len(y) <= hp.summary_maxlen:
             y = np.lib.pad(y, [0, hp.summary_maxlen - len(y)], 'constant', constant_values=(0, 0))
 
         try:
@@ -91,20 +106,31 @@ def create_data(source_path, target_path):
             print("current article length: ", len(x), "current article maxlen: ", hp.article_maxlen)
             print("current summary length: ", len(y), "current summary maxlen: ", hp.summary_maxlen)
 
-        X.append(x)
-        Y.append(y)
+        if not T_Decoder:
+            X.append(x)
+            Y.append(y)
+        else:
+            # here x and y are both 1D array
+            xy = np.concatenate([x, [-1], y], axis=0)
+            XY.append(xy)
+
         Sources.append(" ".join(source_sent).strip())
         Targets.append(" ".join(target_sent).strip())
-        
+
         cur_ariticle_idx += 1
-    
+
     source_file.close()
     target_file.close()
 
-    X = np.array(X)
-    Y = np.array(Y)
-    print("number of data: ", X.shape, Y.shape)
-    return X, Y, Sources, Targets
+    if not T_Decoder:
+        X = np.array(X)
+        Y = np.array(Y)
+        print("number of data: ", X.shape, Y.shape)
+        return X, Y, Sources, Targets
+    else:
+        XY = np.array(XY)
+        print("number of data: ", XY.shape)
+        return XY, Sources, Targets
 
 
 def create_test_data(source_sents):
@@ -112,7 +138,7 @@ def create_test_data(source_sents):
     article2idx, idx2article = load_doc_vocab()
 
     doc_sents = list(map(lambda line: line.split(), source_sents))
-    
+
     # Index
     X, Sources = [], []
 
@@ -140,11 +166,12 @@ def create_test_data(source_sents):
     X = np.array(X)
     return X, Sources
 
-def load_data(type='train'):
-    LEGAL_TYPE = ('train', 'eval', 'test', 'eval_tmp')
+
+def load_data(type='train', T_Decoder=False):
+    LEGAL_TYPE = ('train', 'eval', 'test', 'eval_tmp')  # TODO: remove test
     if type not in LEGAL_TYPE:
-        raise TypeError('Invalid type: should be train/test/eval')
-    
+        raise TypeError('Invalid type: should be train/test/eval/eval_tmp')
+
     if type == 'train' or type == 'eval_tmp':
         doc_path = hp.source_train
         sum_path = hp.target_train
@@ -153,49 +180,41 @@ def load_data(type='train'):
         sum_path = hp.target_valid
     elif type == 'test':
         doc_path = hp.source_test
-    
-    
-    if type == 'test':
-        with open(doc_path, 'r', encoding="utf-8") as docfile:
-            doc_sents = docfile.readlines()
-        X, Sources = create_test_data(doc_sents)
-        return X, Sources # (1064, 150)
 
-    else:
-        X, Y, Sources, Targets = create_data(doc_path, sum_path)
-        if type == 'train':
+    if type == 'train':
+        if not T_Decoder:
+            X, Y, Sources, Targets = create_data(doc_path, sum_path, T_Decoder)
             return X, Y
-        elif type == 'eval':
-            return X, Sources, Targets
-        elif type == 'eval_tmp':
-            return X, Sources, Targets
+        else:
+            XY, Sources, Targets = create_data(doc_path, sum_path, T_Decoder)
+            return XY
+    elif type == 'eval' or type == 'eval_tmp':
+        # since in the eval stage, we only need the article data
+        X, Y, Sources, Targets = create_data(doc_path, sum_path, T_Decoder=False)
+        return X, Sources, Targets
 
 
 def get_batch_data():
     print("getting batch_data...")
-    X, Y = load_data(type='train')
-    
+    X, Y = load_data(type='train', T_Decoder=True)
+
     num_batch = len(X) // hp.batch_size
-    
+
     X = tf.convert_to_tensor(X, tf.int32)
     Y = tf.convert_to_tensor(Y, tf.int32)
 
     input_queues = tf.train.slice_input_producer([X, Y])    # Produces a slice of each `Tensor` in `tensor_list`
     x, y = tf.train.shuffle_batch(input_queues,
                                 num_threads=8,
-                                batch_size=hp.batch_size, 
-                                capacity=hp.batch_size*64,   
-                                min_after_dequeue=hp.batch_size*32, 
+                                batch_size=hp.batch_size,
+                                capacity=hp.batch_size*64,
+                                min_after_dequeue=hp.batch_size*32,
                                 allow_smaller_final_batch=False)
 
     return x, y, num_batch # (N, T), (N, T), ()
 
 
 if __name__ == '__main__':
-    X, Sources, Targets = load_data(type='eval')
-    print("Sources: ", len(Sources), "Targets: ", len(Targets))
-    
-    for source, target in zip(Sources, Targets):
-        print("source: ", source)
-        print("target: ", target)
-        print()
+    XY = load_data(type='train', T_Decoder=True)
+    # print("Sources: ", len(Sources), "Targets: ", len(Targets))
+    print(XY.shape)
