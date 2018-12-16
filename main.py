@@ -12,7 +12,7 @@ import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
 
 from modules import *
-from graph import Graph
+from DGraph import Graph
 from hyperparams import Hyperparams as hp
 from data_load import load_doc_vocab, load_sum_vocab, load_data
 from rouge_tensor import rouge_l_sentence_level
@@ -46,11 +46,6 @@ def train():
             for epoch in range(1, hp.num_epochs+1):
                 print("Starting {}-th epoch".format(epoch))
 
-                # if epoch == 1:
-                #     sess.run(train_g.eta.initializer) # explicitly init eta
-                #     train_g.subset_saver.restore(sess, tf.train.latest_checkpoint(hp.pretrain_logdir))
-                #     print("Restored previous training model!")
-
                 if sv.should_stop():
                     break
 
@@ -58,8 +53,6 @@ def train():
                     true_step = step + (epoch - 1) * train_g.num_batch
 
                     if true_step % hp.train_record_steps == 0:
-                        # outp = [train_g.loss, train_g.acc, train_g.rouge, train_g.globle_norm_ml, train_g.merged, train_g.train_op_ml,]
-                        # loss, acc, rouge, norm_ml, summary, _ = sess.run(outp)
                         summary, _ = sess.run([train_g.merged, train_g.train_op_ml])
                         train_g.filewriter.add_summary(summary, true_step)
                     else:
@@ -77,7 +70,7 @@ def train():
                 # eval(cur_step=true_step, write_file=True)
     print("Done")
 
-
+'''
 def test(num_epoch=10):
     # Load graph
     g = Graph(is_training=False)
@@ -131,7 +124,7 @@ def test(num_epoch=10):
                         print(sentence_to_write)
                         fout.write(sentence_to_write)
                         fout.flush()
-
+'''
 
 def eval(type='eval', cur_step=0, write_file=True):
     # Load graph
@@ -139,7 +132,6 @@ def eval(type='eval', cur_step=0, write_file=True):
     print("Eval Graph loaded")
 
     # Load data
-    # X, Sources, Targets = load_data(type='eval')
     X, Sources, Targets = load_data(type=type)
 
     de2idx, idx2de = load_doc_vocab()
@@ -174,9 +166,12 @@ def eval(type='eval', cur_step=0, write_file=True):
                 targets = Targets[i*hp.batch_size: (i+1)*hp.batch_size]
 
                 ### Autoregressive inference
+                seperate_symbol = 0 - np.ones((hp.batch_size, 1))
                 preds = np.zeros((hp.batch_size, hp.summary_maxlen), np.int32)
-                for j in range(hp.summary_maxlen):
-                    _preds = sess.run(g.preds, {g.x: x, g.y: preds})
+                preds = np.concatenate([x, seperate_symbol, preds], axis=-1)
+
+                for j in range(hp.article_maxlen+1, hp.article_maxlen+1+hp.summary_maxlen):
+                    _preds = sess.run(g.preds, {g.xy: preds})
                     preds[:, j] = _preds[:, j]
 
                 for source, target, pred in zip(sources, targets, preds): # sentence-wise

@@ -9,20 +9,19 @@ from modules import *
 io_pairs = namedtuple(typename='io_pairs', field_names='input output')
 
 class Graph():
-    def __init__(self, is_training=True):
+    def __init__(self, is_training=True, T_Decoder=False):
         self.graph = tf.Graph()
         self.vocab_size = len(load_doc_vocab()[0])  # load_doc_vocab returns: de2idx, idx2de
-
+        
         with self.graph.as_default():
             if is_training:
-                self.x, self.y, self.num_batch = get_batch_data()  # (N, T)
+                self.xy, self.num_batch = get_batch_data(T_Decoder=True)  # (N, article_T+summary_T+1), ()
             else:  # inference
-                self.x = tf.placeholder(tf.int32, shape=(None, hp.article_maxlen))
-                self.y = tf.placeholder(tf.int32, shape=(None, hp.summary_maxlen))
+                self.xy = tf.placeholder(tf.int32, shape=(None, hp.article_maxlen+hp.summary_maxlen+1))
 
-            self.decoder_inputs = tf.concat((tf.ones_like(self.y[:, :1]) * 2, self.y[:, :-1]), -1)  # 2:<S> # define decoder inputs
+            self.decoder_inputs = tf.concat((tf.ones_like(self.xy[:, :1]) * 2, self.xy[:, :-1]), -1)  # 2:<S> # define decoder inputs
 
-            self._add_encoder(is_training=is_training)
+            # self._add_encoder(is_training=is_training)
             self.ml_loss = self._add_ml_loss(is_training=is_training)
             self.loss = self.ml_loss
 
@@ -53,61 +52,14 @@ class Graph():
         self.filewriter = tf.summary.FileWriter(hp.tb_dir + '/train', self.graph)
 
 
-    def _add_encoder(self, is_training):
-        with self.graph.as_default():
-
-            print('Constructing Encoder...')
-            self.enc = embedding(self.x,
-                                 vocab_size=self.vocab_size,
-                                 num_units=hp.hidden_units,
-                                 scale=True,
-                                 scope="encoder_embed")
-
-            self.batch_inp_emb = self.enc
-            with tf.variable_scope("encoder"):
-                if hp.sinusoid:
-                    self.enc += positional_encoding(self.x,
-                                                    num_units=hp.hidden_units,
-                                                    zero_pad=False,
-                                                    scale=False,
-                                                    scope="enc_pe")
-                else:
-                    self.enc += embedding(
-                        tf.tile(tf.expand_dims(tf.range(tf.shape(self.x)[1]), 0), [tf.shape(self.x)[0], 1]),
-                        vocab_size=hp.article_maxlen,
-                        num_units=hp.hidden_units,
-                        zero_pad=False,
-                        scale=False,
-                        scope="enc_pe")
-
-                ## Dropout ***
-                self.enc = tf.layers.dropout(self.enc,
-                                             rate=hp.dropout_rate,
-                                             training=tf.convert_to_tensor(is_training))
-                                             
-                ## Blocks
-                for i in range(hp.num_blocks):
-                    with tf.variable_scope("num_blocks_{}".format(i)):
-                        self.enc = multihead_attention(queries=self.enc,
-                                                       keys=self.enc,
-                                                       num_units=hp.hidden_units,
-                                                       num_heads=hp.num_heads,
-                                                       dropout_rate=hp.dropout_rate,
-                                                       is_training=is_training,
-                                                       causality=False)
-
-                        self.enc = feedforward(self.enc, num_units=[hp.ffw_unit, hp.hidden_units])
-                        ## ATTENTION: the hard-coded >> 4 * hp.hidden_units <<
-                        tf.summary.histogram(name="ffw-output/{}".format(i), values=self.enc)
-
-
     def _add_decoder(self, is_training, decoder_inputs, inside_loop=False, reuse=None):
         with self.graph.as_default():
+
             # Decoder
             self.dec = embedding(decoder_inputs,
                                  vocab_size=self.vocab_size,
                                  num_units=hp.hidden_units,
-                                 lookup_table=self.get_embedding_table(concated=True),
+                                 # lookup_table=self.get_embedding_table(concated=True),
                                  scale=True,
                                  scope="decoder_embed",
                                  reuse=reuse)
@@ -118,7 +70,6 @@ class Graph():
                 ## Positional Encoding
                 if hp.sinusoid:
                     self.dec += positional_encoding(decoder_inputs,
-                                                    vocab_size=hp.summary_maxlen,
                                                     num_units=hp.hidden_units,
                                                     zero_pad=False,
                                                     scale=False,
@@ -127,7 +78,7 @@ class Graph():
                 else:
                     self.dec += embedding(tf.tile(tf.expand_dims(tf.range(tf.shape(decoder_inputs)[1]), 0),
                                                   [tf.shape(decoder_inputs)[0], 1]),
-                                          vocab_size=hp.summary_maxlen,
+                                          vocab_size=hp.article_maxlen+hp.summary_maxlen+1,
                                           num_units=hp.hidden_units,
                                           zero_pad=False,
                                           scale=False,
@@ -142,6 +93,7 @@ class Graph():
                 ## Blocks
                 for i in range(hp.num_blocks):
                     with tf.variable_scope("num_blocks_{}".format(i)):
+                        # remove the input embedding
                         self.dec = multihead_attention(queries=self.dec,
                                                        keys=self.dec,
                                                        num_units=hp.hidden_units,
@@ -150,17 +102,6 @@ class Graph():
                                                        is_training=is_training,
                                                        causality=True,
                                                        scope="self_attention",
-                                                       inside_loop=inside_loop,
-                                                       reuse=reuse)
-
-                        self.dec = multihead_attention(queries=self.dec,
-                                                       keys=self.enc,
-                                                       num_units=hp.hidden_units,
-                                                       num_heads=hp.num_heads,
-                                                       dropout_rate=hp.dropout_rate,
-                                                       is_training=is_training,
-                                                       causality=False,
-                                                       scope="vanilla_attention",
                                                        inside_loop=inside_loop,
                                                        reuse=reuse)
 
@@ -179,19 +120,23 @@ class Graph():
 
         with self.graph.as_default():
             self.preds = tf.to_int32(tf.argmax(logits, axis=-1)) # shape: (batch_size, max_timestep)
-            self.istarget = tf.to_float(tf.not_equal(self.y, 0)) # shape: (batch_size, max_timestep)
-            self.acc = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.y)) * self.istarget) / (
+            self.istarget = tf.to_float(tf.not_equal(self.xy, 0)) # shape: (batch_size, max_timestep)
+            self.acc_full = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.xy)) * self.istarget) / (
+                tf.reduce_sum(self.istarget))
+            self.acc_sum = tf.reduce_sum(tf.to_float(tf.equal(self.preds[hp.article_maxlen+1:], self.xy[hp.article_maxlen+1:])) * self.istarget) / (
                 tf.reduce_sum(self.istarget))
 
-            self.rouge = tf.reduce_sum(rouge_l_fscore(self.preds, self.y)) / float(hp.batch_size)
+            self.rouge = tf.reduce_sum(rouge_l_fscore(self.preds[hp.article_maxlen+1:], self.xy[hp.article_maxlen+1:])) / float(hp.batch_size)
 
-            tf.summary.scalar('acc', self.acc)
+            tf.summary.scalar('acc in full range', self.acc_full)
+            tf.summary.scalar('acc only for summary part', self.acc_sum)
+
             tf.summary.scalar('rouge', self.rouge)
 
             ml_loss = -100
             if is_training:
                 # Loss
-                self.y_smoothed = label_smoothing(tf.one_hot(self.y, depth=self.vocab_size))
+                self.y_smoothed = label_smoothing(tf.one_hot(self.xy, depth=self.vocab_size))
                 loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y_smoothed)
                 ml_loss = tf.reduce_sum(loss * self.istarget, name='fake_ml_loss') / (tf.reduce_sum(self.istarget))
 

@@ -18,8 +18,9 @@ def load_doc_vocab():
         idx, word = line.split()
         word2idx[word] = int(idx)
         idx2word[int(idx)] = word
-
-    logging.info("Size of doc dict: {}".format(len(word2idx)))
+        
+    print(idx)
+    print("Size of doc dict: {}".format(len(word2idx)))
     return word2idx, idx2word
 
 
@@ -32,7 +33,7 @@ def load_sum_vocab():
         word2idx[word] = int(idx)
         idx2word[int(idx)] = word
 
-    logging.info("Size of doc dict: {}".format(len(word2idx)))
+    print("Size of doc dict: {}".format(len(word2idx)))
     return word2idx, idx2word
 
 
@@ -111,7 +112,7 @@ def create_data(source_path, target_path, T_Decoder=False):
             Y.append(y)
         else:
             # here x and y are both 1D array
-            xy = np.concatenate([x, [-1], y], axis=0)
+            xy = np.concatenate([x, [4], y], axis=0)  ### TODO (un hardcode 4 )
             XY.append(xy)
 
         Sources.append(" ".join(source_sent).strip())
@@ -134,6 +135,9 @@ def create_data(source_path, target_path, T_Decoder=False):
 
 
 def create_test_data(source_sents):
+    """
+    only for giga summary data
+    """
     print("Creating data...")
     article2idx, idx2article = load_doc_vocab()
 
@@ -194,27 +198,40 @@ def load_data(type='train', T_Decoder=False):
         return X, Sources, Targets
 
 
-def get_batch_data():
+def get_batch_data(T_Decoder=False):
     print("getting batch_data...")
-    X, Y = load_data(type='train', T_Decoder=True)
-
-    num_batch = len(X) // hp.batch_size
-
-    X = tf.convert_to_tensor(X, tf.int32)
-    Y = tf.convert_to_tensor(Y, tf.int32)
-
-    input_queues = tf.train.slice_input_producer([X, Y])    # Produces a slice of each `Tensor` in `tensor_list`
-    x, y = tf.train.shuffle_batch(input_queues,
-                                num_threads=8,
-                                batch_size=hp.batch_size,
-                                capacity=hp.batch_size*64,
-                                min_after_dequeue=hp.batch_size*32,
-                                allow_smaller_final_batch=False)
-
-    return x, y, num_batch # (N, T), (N, T), ()
+    if not T_Decoder:
+        X, Y = load_data(type='train', T_Decoder=T_Decoder)
+        num_batch = len(X) // hp.batch_size
+        X = tf.convert_to_tensor(X, tf.int32)
+        Y = tf.convert_to_tensor(Y, tf.int32)
+        input_queues = tf.train.slice_input_producer([X, Y])    # Produces a slice of each `Tensor` in `tensor_list`
+        x, y = tf.train.shuffle_batch(input_queues,
+                                    num_threads=8,
+                                    batch_size=hp.batch_size,
+                                    capacity=hp.batch_size*64,
+                                    min_after_dequeue=hp.batch_size*32,
+                                    allow_smaller_final_batch=False)
+        return x, y, num_batch # (N, T), (N, T), ()
+    else:
+        XY = load_data(type='train', T_Decoder=T_Decoder)
+        num_batch = len(XY) // hp.batch_size
+        XY = tf.convert_to_tensor(XY, tf.int32)
+        input_queues = tf.train.slice_input_producer([XY])    # Produces a slice of each `Tensor` in `tensor_list`
+        xy = tf.train.shuffle_batch(input_queues,
+                                    num_threads=8,
+                                    batch_size=hp.batch_size,
+                                    capacity=hp.batch_size*64,
+                                    min_after_dequeue=hp.batch_size*32,
+                                    allow_smaller_final_batch=False)
+        # when input_queues only has length 1, it seems that shuffle_batch()
+        # will return a single Tensor() orther than a list
+        return xy, num_batch # (N, article_T+summary_T+1), ()
 
 
 if __name__ == '__main__':
-    XY = load_data(type='train', T_Decoder=True)
-    # print("Sources: ", len(Sources), "Targets: ", len(Targets))
-    print(XY.shape)
+    # XY = load_data(type='train', T_Decoder=True)
+    # print(XY.shape)
+
+    get_batch_data(T_Decoder=True)  # generate a Tensor
+    get_batch_data(T_Decoder=False) # generate a List
