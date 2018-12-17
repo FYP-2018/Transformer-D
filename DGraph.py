@@ -12,7 +12,7 @@ class Graph():
     def __init__(self, is_training=True, T_Decoder=False):
         self.graph = tf.Graph()
         self.vocab_size = len(load_doc_vocab()[0])  # load_doc_vocab returns: de2idx, idx2de
-        
+
         with self.graph.as_default():
             if is_training:
                 self.xy, self.num_batch = get_batch_data(T_Decoder=True)  # (N, article_T+summary_T+1), ()

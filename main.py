@@ -22,8 +22,10 @@ def train():
         os.mkdir(hp.logdir)
 
     # Load vocabulary
+    """
     de2idx, idx2de = load_doc_vocab()
     en2idx, idx2en = load_sum_vocab()
+    """
 
     print("Constructing graph...")
     train_g = Graph("train")
@@ -59,7 +61,7 @@ def train():
                         sv.saver.save(sess, hp.logdir + '/model_epoch_%02d_step_%d' % (epoch, true_step))
 
                     if true_step > 0 and true_step % hp.eval_record_steps == 0:
-                        pass
+                        # pass
                         eval(cur_step=true_step, write_file=False)
 
                     # iteration indent
@@ -67,61 +69,7 @@ def train():
                 # eval(cur_step=true_step, write_file=True)
     print("Done")
 
-'''
-def test(num_epoch=10):
-    # Load graph
-    g = Graph(is_training=False)
-    print("Test Graph loaded")
 
-    # Load data
-    X, Sources = load_data(type='test')
-    word2idx, idx2word = load_sum_vocab()
-
-    # Start session
-    with g.graph.as_default():
-        sv = tf.train.Supervisor(logdir=hp.logdir)
-        # with sv.managed_session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
-        with sv.managed_session(
-            start_standard_services=False,
-            config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
-        ) as sess:
-
-            ## Restore parameters
-            sv.saver.restore(sess, tf.train.latest_checkpoint(hp.logdir))
-            print("Restored!")
-
-            ## Get model name
-            mname = open(hp.logdir + '/checkpoint', 'r').read().split('"')[1] # model name
-
-            ## Inference
-            if not os.path.exists('results'):
-                os.mkdir('results')
-
-            with codecs.open("results/test-" + mname, "w", "utf-8") as fout:
-                list_of_refs, hypotheses = [], []
-                for i in range(len(X) // hp.batch_size):
-                    ### Get mini-batches
-                    x = X[i*hp.batch_size: (i+1)*hp.batch_size]
-                    sources = Sources[i*hp.batch_size: (i+1)*hp.batch_size]
-
-                    ### Autoregressive inference
-                    # preds = np.zeros((hp.batch_size, hp.summary_maxlen), np.int32)
-                    preds = np.zeros((x.shape[0], hp.summary_maxlen), np.int32)
-                    for j in range(hp.summary_maxlen):
-                        # _preds = sess.run(g.preds, {g.x: x, g.y: preds})
-                        _preds, _acc = sess.run([g.preds, g.acc], {g.x: x, g.y: preds})
-                        preds[:, j] = _preds[:, j]
-
-                    print("at step {}: rough-1 = {}".format(num_epoch, _acc))
-
-                    for source, pred in zip(sources, preds): # sentence-wise
-                        got = " ".join(idx2word[idx] for idx in pred).split("</S>")[0].strip()
-                        sentence_to_write = "- source: " + source + "\n- got: " + got + "\n\n"
-
-                        print(sentence_to_write)
-                        fout.write(sentence_to_write)
-                        fout.flush()
-'''
 
 def eval(type='eval', cur_step=0, write_file=True):
     # Load graph
@@ -131,7 +79,6 @@ def eval(type='eval', cur_step=0, write_file=True):
     # Load data
     X, Sources, Targets = load_data(type=type)
 
-    de2idx, idx2de = load_doc_vocab()
     word2idx, idx2word = load_sum_vocab()
 
 
