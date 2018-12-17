@@ -18,11 +18,8 @@ from data_load import load_doc_vocab, load_sum_vocab, load_data
 from rouge_tensor import rouge_l_sentence_level
 
 def train():
-    try:
-        if not os.path.exists(hp.logdir):
-            os.mkdir(hp.logdir)
-    except:
-        tf.logging.info('making logdir failed')
+    if not os.path.exists(hp.logdir):
+        os.mkdir(hp.logdir)
 
     # Load vocabulary
     de2idx, idx2de = load_doc_vocab()
