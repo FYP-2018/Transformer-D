@@ -18,7 +18,7 @@ def load_doc_vocab():
         idx, word = line.split()
         word2idx[word] = int(idx)
         idx2word[int(idx)] = word
-        
+
     print(idx)
     print("Size of doc dict: {}".format(len(word2idx)))
     return word2idx, idx2word
