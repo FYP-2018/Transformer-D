@@ -1,4 +1,5 @@
 from collections import namedtuple
+
 import tensorflow as tf
 
 from hyperparams import Hyperparams as hp

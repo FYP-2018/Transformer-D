@@ -5,11 +5,10 @@
 from __future__ import print_function
 import os, codecs
 import logging
-from tqdm import tqdm
 
 import numpy as np
 import tensorflow as tf
-from nltk.translate.bleu_score import corpus_bleu
+# from nltk.translate.bleu_score import corpus_bleu
 
 from modules import *
 from DGraph import Graph

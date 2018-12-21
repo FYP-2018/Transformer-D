@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 #/usr/bin/python3
 
+# build-in
 from __future__ import print_function
-from hyperparams import Hyperparams as hp
+import codecs
+import logging
+
+# external library
 import tensorflow as tf
 import numpy as np
-import codecs
 import regex
-import logging
+
+# self-defined
+from hyperparams import Hyperparams as hp
 
 
 def load_doc_vocab():
