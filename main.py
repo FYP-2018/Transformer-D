@@ -77,7 +77,6 @@ def eval(type='eval', cur_step=0, write_file=True):
 
     # Load data
     X, Sources, Targets = load_data(type=type)
-
     word2idx, idx2word = load_sum_vocab()
 
 
