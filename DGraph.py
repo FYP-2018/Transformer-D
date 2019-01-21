@@ -26,7 +26,13 @@ class Graph():
             self.ml_loss = self._add_ml_loss(is_training=is_training)
             self.loss = self.ml_loss
 
-            if is_training:
+            if not is_training:
+                tf.summary.scalar('eval acc in full range', self.acc_full)
+                tf.summary.scalar('eval acc only for summary part', self.acc_sum)
+                tf.summary.scalar('eval rouge', self.rouge)
+                self.merged = tf.summary.merge_all()
+
+            else:
                 self.global_step = tf.Variable(0, name='global_step', trainable=False)
                 self.optimizer = tf.train.AdamOptimizer(learning_rate=hp.lr, beta1=0.9, beta2=0.98, epsilon=1e-8)
 
@@ -45,12 +51,15 @@ class Graph():
                 '''
 
                 # Summary
+                tf.summary.scalar('acc in full range', self.acc_full)
+                tf.summary.scalar('acc only for summary part', self.acc_sum)
+                tf.summary.scalar('rouge', self.rouge)
                 tf.summary.scalar('globle_norm_ml', globle_norm_ml)
                 tf.summary.scalar('loss', self.loss)
-
                 self.merged = tf.summary.merge_all()
-
-        self.filewriter = tf.summary.FileWriter(hp.tb_dir + '/train', self.graph)
+                
+        # self.filewriter = tf.summary.FileWriter(hp.tb_dir + '/train', self.graph)
+        self.filewriter = tf.summary.FileWriter(hp.tb_dir + '/train')
 
 
     def _add_decoder(self, is_training, decoder_inputs, inside_loop=False, reuse=None):
@@ -128,11 +137,6 @@ class Graph():
                 tf.reduce_sum(self.istarget))
 
             self.rouge = tf.reduce_sum(rouge_l_fscore(self.preds[hp.article_maxlen+1:], self.xy[hp.article_maxlen+1:])) / float(hp.batch_size)
-
-            tf.summary.scalar('acc in full range', self.acc_full)
-            tf.summary.scalar('acc only for summary part', self.acc_sum)
-
-            tf.summary.scalar('rouge', self.rouge)
 
             ml_loss = -100
             if is_training:

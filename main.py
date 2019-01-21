@@ -21,11 +21,6 @@ def train():
         os.mkdir(hp.logdir)
 
     # Load vocabulary
-    """
-    de2idx, idx2de = load_doc_vocab()
-    en2idx, idx2en = load_sum_vocab()
-    """
-
     print("Constructing graph...")
     train_g = Graph("train")
 
@@ -53,6 +48,7 @@ def train():
                     if true_step % hp.train_record_steps == 0:
                         summary, _ = sess.run([train_g.merged, train_g.train_op_ml])
                         train_g.filewriter.add_summary(summary, true_step)
+                        print("=============== summary in training: ", summary)
                     else:
                         sess.run(train_g.train_op_ml)
 
@@ -60,7 +56,6 @@ def train():
                         sv.saver.save(sess, hp.logdir + '/model_epoch_%02d_step_%d' % (epoch, true_step))
 
                     if true_step > 0 and true_step % hp.eval_record_steps == 0:
-                        # pass
                         eval(cur_step=true_step, write_file=False)
 
                     # iteration indent
@@ -77,6 +72,7 @@ def eval(type='eval', cur_step=0, write_file=True):
 
     # Load data
     X, Sources, Targets = load_data(type=type)
+
     word2idx, idx2word = load_sum_vocab()
 
 
@@ -101,19 +97,36 @@ def eval(type='eval', cur_step=0, write_file=True):
             list_of_refs, hypotheses = [], []
             num_batch = len(X) // hp.batch_size
             print("num batch: ", num_batch, "len(X): ", len(X) )
+            
             for i in range(num_batch):
+                print("the {} th set of batch ".format(i))
+            
                 ### Get mini-batches
                 x = X[i*hp.batch_size: (i+1)*hp.batch_size]
                 sources = Sources[i*hp.batch_size: (i+1)*hp.batch_size]
                 targets = Targets[i*hp.batch_size: (i+1)*hp.batch_size]
 
                 ### Autoregressive inference
-                seperate_symbol = 0 - np.ones((hp.batch_size, 1))
+                seperate_symbol = 4 * np.ones((hp.batch_size, 1))
                 preds = np.zeros((hp.batch_size, hp.summary_maxlen), np.int32)
                 preds = np.concatenate([x, seperate_symbol, preds], axis=-1)
 
                 for j in range(hp.article_maxlen+1, hp.article_maxlen+1+hp.summary_maxlen):
-                    _preds = sess.run(g.preds, {g.xy: preds})
+                    if j % 10 == 0: 
+                        print("generating {} prediction position".format(j))
+                
+                    # _preds = sess.run(g.preds, {g.xy: preds})
+
+                    if j % 10 == 0: 
+                        print("generating {} prediction position".format(j))
+
+                    if j == hp.article_maxlen + hp.summary_maxlen:  # record the accuracy at the end of inference
+                        print(g.merged)
+                        _preds, summary = sess.run([g.preds, g.merged], {g.xy: preds})
+                        g.filewriter.add_summary(summary, cur_step)
+                    else:
+                        _preds = sess.run(g.preds, {g.xy: preds})
+                    
                     preds[:, j] = _preds[:, j]
 
                 for source, target, pred in zip(sources, targets, preds): # sentence-wise
@@ -155,4 +168,6 @@ if __name__ == '__main__':
     logging.info("local device: ", dl.list_local_devices())
 
     train()
+    # for i in range(10):
+        # eval(type='eval', cur_step=i, write_file=False)
     # eval()
